@@ -251,12 +251,14 @@ where
 
         res += updated_points.len();
         // Insert new points, which was not updated or existed
-        let new_point_ids = ids_chunk
+        let mut new_point_ids = ids_chunk
             .iter()
             .copied()
-            .filter(|x| !updated_points.contains(x));
+            .filter(|x| !updated_points.contains(x))
+            .peekable();
 
-        {
+        // Don't select and write-lock an appendable segment for a chunk that inserts nothing
+        if new_point_ids.peek().is_some() {
             let default_write_segment =
                 segments.smallest_appendable_segment().ok_or_else(|| {
                     OperationError::service_error(
@@ -274,7 +276,7 @@ where
                 )?);
             }
             RwLockWriteGuard::unlock_fair(write_segment);
-        };
+        }
     }
 
     Ok(res)
