@@ -84,7 +84,7 @@ impl<S: UniversalRead> TrackerRead<S> for ReadOnlyTracker<S> {
     }
 
     fn get(&self, point_offset: PointOffset) -> Result<Option<ValuePointer>> {
-        read_slot(&self.storage, point_offset)
+        read_slot(&self.storage, self.storage.len::<u8>()?, point_offset)
     }
 
     fn iter<U, I>(&self, point_offsets: I) -> Result<Iter<'_, U, I, S>>

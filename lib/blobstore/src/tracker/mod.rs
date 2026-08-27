@@ -145,12 +145,12 @@ pub trait TrackerRead<S: UniversalRead> {
 /// slots — the file is zero-initialized and all-zeroes is the `None` slot.
 fn read_slot<S: UniversalRead>(
     storage: &S,
+    storage_len: u64,
     point_offset: PointOffset,
 ) -> Result<Option<ValuePointer>> {
     let start_offset =
         size_of::<TrackerHeader>() + point_offset as usize * size_of::<OptionalPointer>();
     let end_offset = start_offset + size_of::<OptionalPointer>();
-    let storage_len = storage.len::<u8>()?;
     if end_offset as u64 > storage_len {
         return Ok(None);
     }
@@ -295,6 +295,11 @@ pub struct Tracker<S> {
     header: TrackerHeader,
     /// Storage for the file (universal io backend)
     storage: S,
+    /// Byte length of the storage file
+    ///
+    /// The file only grows in `persist_pointer`, which refreshes this. Caching it saves querying
+    /// the file length (an `fstat` on some backends) for every slot read.
+    storage_len: u64,
     /// Updates that haven't been flushed
     ///
     /// When flushing, these updates get written into the storage and flushed at once.
@@ -351,12 +356,14 @@ impl<S: UniversalRead> Tracker<S> {
         let storage = Self::open_storage(fs, &path, populate, writeable)?;
 
         let header: TrackerHeader = Self::read_header(&storage)?;
+        let storage_len = storage.len::<u8>()?;
         let pending_updates = AHashMap::new();
         Ok(Self {
             next_pointer_offset: header.next_pointer_offset,
             path,
             header,
             storage,
+            storage_len,
             pending_updates,
         })
     }
@@ -392,7 +399,7 @@ impl<S: UniversalRead> Tracker<S> {
 
     /// Get the raw value at the given point offset
     fn get_raw(&self, point_offset: PointOffset) -> Result<Option<ValuePointer>> {
-        read_slot(&self.storage, point_offset)
+        read_slot(&self.storage, self.storage_len, point_offset)
     }
 
     /// Get the page pointer at the given point offset
@@ -473,12 +480,14 @@ where
             tracker_open_options(Populate::No, true),
             Default::default(),
         )?;
+        let storage_len = storage.len::<u8>()?;
         let header = TrackerHeader::default();
         let pending_updates = AHashMap::new();
         let mut page_tracker = Self {
             path,
             header,
             storage,
+            storage_len,
             pending_updates,
             next_pointer_offset: 0,
         };
@@ -559,7 +568,7 @@ where
         point_offset: PointOffset,
         pointer: Option<ValuePointer>,
     ) -> Result<()> {
-        let storage_len = self.storage.len::<u8>()? as usize;
+        let storage_len = self.storage_len as usize;
         if pointer.is_none() && point_offset as usize >= storage_len {
             return Ok(());
         }
@@ -574,6 +583,7 @@ where
             let new_size = end_offset.next_power_of_two();
             create_and_ensure_length(&self.path, new_size)?;
             self.storage.reopen()?;
+            self.storage_len = self.storage.len::<u8>()?;
         }
 
         let pointer = OptionalPointer::from(pointer);
