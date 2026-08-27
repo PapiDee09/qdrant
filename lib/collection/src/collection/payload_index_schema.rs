@@ -96,6 +96,11 @@ impl Collection {
         self.payload_index_schema.read().schema.get(key).cloned()
     }
 
+    /// Number of payload indexes declared in the collection schema.
+    pub fn payload_index_count(&self) -> usize {
+        self.payload_index_schema.read().schema.len()
+    }
+
     /// Returns an arbitrary payload key along with acceptable
     /// schemas used by `filter` which can be indexed but currently is not.
     /// If this function returns `None` all indexable keys in `filter` are indexed.

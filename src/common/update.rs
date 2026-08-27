@@ -219,8 +219,9 @@ impl StrictModeVerification for CreateFieldIndex {
         strict_mode_config: &StrictModeConfig,
     ) -> CollectionResult<()> {
         if let Some(max_payload_index_count) = strict_mode_config.max_payload_index_count {
-            let collection_info = collection.info(&ShardSelectorInternal::All).await?;
-            if collection_info.payload_schema.len() >= max_payload_index_count {
+            // Read the declared payload index schema directly: `Collection::info` would
+            // query every shard (including remote ones) just to count indexes.
+            if collection.payload_index_count() >= max_payload_index_count {
                 return Err(CollectionError::strict_mode(
                     format!(
                         "Collection already has the maximum number of payload indices ({max_payload_index_count})"
