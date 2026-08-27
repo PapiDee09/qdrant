@@ -757,21 +757,24 @@ impl Consensus {
     fn advance_node_impl(&mut self, message: Message) -> anyhow::Result<()> {
         match message {
             Message::FromClient(ConsensusOperations::AddPeer { peer_id, uri }) => {
-                let existing_uris = self
+                let parsed_uri: Uri = uri.parse().context("peer URI is not a valid URI")?;
+                let registered_peer_id = self
                     .broker
                     .consensus_state
-                    .peer_address_by_id()
-                    .into_iter()
-                    .map(|(peer_id, url)| (url, peer_id))
-                    .collect::<HashMap<_, _>>();
+                    .persistent
+                    .read()
+                    .peer_address_by_id
+                    .read()
+                    .iter()
+                    .find(|(_, url)| **url == parsed_uri)
+                    .map(|(id, _)| *id);
 
                 // Don't allow a peer URI to join if already in consensus
                 // - new URIs can always join
                 // - existing URIs can re-join with the same peer ID
                 // See: <https://github.com/qdrant/qdrant/pull/7375>
-                if let Some(registered_peer_id) =
-                    existing_uris.get(&uri.parse::<Uri>().context("peer URI is not a valid URI")?)
-                    && registered_peer_id != &peer_id
+                if let Some(registered_peer_id) = registered_peer_id
+                    && registered_peer_id != peer_id
                 {
                     log::warn!(
                         "Rejected peer {peer_id} to join consensus, URI is already registered by peer {registered_peer_id} ({uri})",
