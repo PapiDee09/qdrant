@@ -1,7 +1,7 @@
 use segment::data_types::load_profile::LoadProfile;
 use segment::data_types::order_by::OrderByInterface;
 use segment::types::{Filter, PointIdType, WithPayloadInterface, WithVector};
-use shard::scroll::ScrollRequestInternal;
+use shard::scroll::scroll_load_profile;
 
 /// Scroll request — paginate over all points which match the given conditions.
 #[derive(Clone, Debug, PartialEq)]
@@ -36,7 +36,11 @@ impl ScrollRequest {
     /// this scroll: no vector components are warmed, and only the field indexes the
     /// filter and `order_by` read keep their configured placement.
     pub fn load_profile(&self) -> LoadProfile {
-        ScrollRequestInternal::from(self.clone()).load_profile()
+        scroll_load_profile(
+            self.filter.as_ref(),
+            self.order_by.as_ref(),
+            self.with_payload.as_ref(),
+        )
     }
 }
 
