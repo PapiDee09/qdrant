@@ -2,7 +2,6 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use ahash::HashSet;
 use async_trait::async_trait;
 use common::counter::hardware_accumulator::HwMeasurementAcc;
 use common::flags::feature_flags;
@@ -677,23 +676,17 @@ impl ShardOperation for ForwardProxyShard {
             {
                 let filter = filter.clone();
 
-                let affected_points: HashSet<_> = self
+                // Only point IDs are needed, read them directly rather than scrolling records
+                let affected_points = self
                     .wrapped_shard
-                    .local_scroll_by_id(
-                        None,
-                        point_ids.len(),
-                        &WithPayloadInterface::Bool(false),
-                        &WithVector::Bool(false),
+                    .read_filtered(
                         Some(&filter.with_point_ids(point_ids)),
                         &self.wrapped_shard.search_runtime,
-                        None,                           // No timeout
                         HwMeasurementAcc::disposable(), // Internal operation, no need to measure hardware here?
+                        None,                           // No timeout
                         DeferredBehavior::WithDeferred,
                     )
-                    .await?
-                    .into_iter()
-                    .map(|record| record.id)
-                    .collect();
+                    .await?;
                 // Operation is applicable to a subset of points, only forward those
                 Some(affected_points)
             } else {
