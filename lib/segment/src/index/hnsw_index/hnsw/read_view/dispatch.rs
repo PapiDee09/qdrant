@@ -97,9 +97,13 @@ where
 
                     let params_ref = if exact { exact_params.as_ref() } else { params };
 
+                    let query_cardinality = self
+                        .payload_index
+                        .estimate_cardinality(query_filter, &query_context.hardware_counter())?;
                     return self.search_vectors_plain(
                         vectors,
                         query_filter,
+                        &query_cardinality,
                         top,
                         params_ref,
                         query_context,
@@ -126,6 +130,7 @@ where
                     return self.search_vectors_plain(
                         vectors,
                         query_filter,
+                        &query_cardinality,
                         top,
                         params,
                         query_context,
@@ -170,7 +175,14 @@ where
                     // if cardinality is small - use plain index
                     let _timer =
                         ScopeDurationMeasurer::new(&self.searches_telemetry.small_cardinality);
-                    self.search_vectors_plain(vectors, query_filter, top, params, query_context)
+                    self.search_vectors_plain(
+                        vectors,
+                        query_filter,
+                        &query_cardinality,
+                        top,
+                        params,
+                        query_context,
+                    )
                 }
             }
         }
