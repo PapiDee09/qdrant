@@ -273,11 +273,12 @@ impl<S: UniversalWrite> Bitmask<S> {
             (page_id as PageId, page_block_offset as BlockOffset)
         };
 
-        let all_bits = self.bitslice.read_all()?;
-        let regions_bitslice = &all_bits[regions_start_offset..regions_end_offset];
+        let regions_bitslice = self
+            .bitslice
+            .read_bit_range(regions_start_offset as u64..regions_end_offset as u64)?;
 
         Ok(Self::find_available_blocks_in_slice(
-            regions_bitslice,
+            &regions_bitslice,
             num_blocks,
             translate_to_answer,
         ))
