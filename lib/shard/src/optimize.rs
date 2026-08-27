@@ -17,7 +17,7 @@ use common::disk::dir_disk_size;
 use common::fs::safe_delete_with_suffix;
 use common::progress_tracker::ProgressTracker;
 use common::storage_version::StorageVersion;
-use common::types::PointOffsetType;
+use common::types::{DeferredBehavior, PointOffsetType};
 use fs_err as fs;
 use itertools::Itertools;
 use parking_lot::lock_api::RwLockWriteGuard;
@@ -460,13 +460,10 @@ fn optimize_segment_propagate_changes<F: ?Sized + OptimizationStrategy>(
     // Avoid unnecessary point removing in the critical section:
     // - save already removed points while avoiding long read locks
     // - exclude already removed points from post-optimization removing
-    let already_remove_points = {
-        let mut all_removed_points = proxy_deleted_points(proxies);
-        for existing_point in optimized_segment.iter_points() {
-            all_removed_points.remove(&existing_point);
-        }
-        all_removed_points
-    };
+    let mut already_remove_points = proxy_deleted_points(proxies);
+    already_remove_points.retain(|point_id, _| {
+        !optimized_segment.has_point(*point_id, DeferredBehavior::WithDeferred)
+    });
 
     // ---- SLOW PART ENDS HERE -----
 
