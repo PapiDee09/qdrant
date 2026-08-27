@@ -811,10 +811,15 @@ impl ShardHolder {
         &self,
         key: &'a ShardKeyWithFallback,
     ) -> CollectionResult<(HashSet<ShardId>, &'a ShardKey)> {
-        let mut shard_key_to_ids_mapping = self.get_shard_key_to_ids_mapping();
-
-        let target_shard_ids = shard_key_to_ids_mapping.remove(&key.target);
-        let fallback_shard_ids = shard_key_to_ids_mapping.remove(&key.fallback);
+        let (target_shard_ids, fallback_shard_ids) = {
+            let key_mapping = self.key_mapping.read();
+            let target_shard_ids = key_mapping.get(&key.target).cloned();
+            // No distinct fallback if it is the same as the target
+            let fallback_shard_ids = (key.fallback != key.target)
+                .then(|| key_mapping.get(&key.fallback).cloned())
+                .flatten();
+            (target_shard_ids, fallback_shard_ids)
+        };
 
         if let Some(target_shard_ids) = target_shard_ids {
             let target_replicas = target_shard_ids
