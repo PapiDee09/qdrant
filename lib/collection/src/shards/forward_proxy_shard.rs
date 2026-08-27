@@ -166,7 +166,13 @@ impl ForwardProxyShard {
     /// This method is cancel safe.
     pub async fn transfer_indexes(&self) -> CollectionResult<()> {
         let _update_lock = self.update_lock.lock().await;
-        for (index_key, index_type) in self.wrapped_shard.info().await?.payload_schema {
+        let payload_schema = self
+            .wrapped_shard
+            .payload_index_schema
+            .read()
+            .schema
+            .clone();
+        for (index_key, index_type) in payload_schema {
             // TODO: Is cancelling `RemoteShard::update` safe for *receiver*?
             self.remote_shard
                 .update(
@@ -174,7 +180,7 @@ impl ForwardProxyShard {
                     OperationWithClockTag::from(CollectionUpdateOperations::FieldIndexOperation(
                         FieldIndexOperations::CreateIndex(CreateIndex {
                             field_name: index_key,
-                            field_schema: Some(index_type.try_into()?),
+                            field_schema: Some(index_type),
                         }),
                     )),
                     WaitUntil::Wal,
@@ -813,6 +819,7 @@ impl ShardOperation for ForwardProxyShard {
         let local_shard = &self.wrapped_shard;
         local_shard.info().await
     }
+
     async fn core_search(
         &self,
         request: Arc<CoreSearchRequestBatch>,
