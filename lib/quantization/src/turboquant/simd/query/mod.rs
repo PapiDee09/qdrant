@@ -234,11 +234,11 @@ impl<const PLANES: usize> QuerySimd<PLANES> {
             #[cfg(target_arch = "x86_64")]
             Backend::Avx2 => unsafe { self.dotprod_raw_avx2(vector) },
             #[cfg(target_arch = "x86_64")]
-            Backend::Sse => self.dotprod_raw(vector),
+            Backend::Sse => unsafe { self.dotprod_raw_sse(vector) },
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             Backend::NeonSdot => unsafe { self.dotprod_raw_neon_sdot(vector) },
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            Backend::Neon => self.dotprod_raw(vector),
+            Backend::Neon => unsafe { self.dotprod_raw_neon(vector) },
             Backend::Scalar => self.dotprod_raw(vector),
         }
     }
