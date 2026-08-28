@@ -306,6 +306,10 @@ impl<const PLANES: usize, const QUERY_BYTES: usize> QuerySimd<PLANES, QUERY_BYTE
             Backend::Avx512Vnni => unsafe { self.dotprod_batch_avx512_vnni(data, stride, out) },
             #[cfg(target_arch = "x86_64")]
             Backend::Avx2 => unsafe { self.dotprod_batch_avx2(data, stride, out) },
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            Backend::NeonSdot => unsafe { self.dotprod_batch_neon_sdot(data, stride, out) },
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            Backend::Neon => unsafe { self.dotprod_batch_neon(data, stride, out) },
             _ => self.dotprod_batch_per_vector(data, stride, out),
         }
     }
